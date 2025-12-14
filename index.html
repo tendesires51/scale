@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Scale</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="game">
+    <div id="header">
+      <div id="scalePoints">Scale Points: 0</div>
+      <div id="distance">0 m</div>
+      <div id="rate">+0 m / sec</div>
+      <div id="mass" style="display: none; color: #f88; margin-top: 1rem;">0 g</div>
+      <div id="massRate" style="display: none; opacity: 0.7;">+0 g / sec</div>
+    </div>
+
+    <div id="tabs">
+      <button class="tab-btn active" data-tab="main" onclick="switchTab('main')">Main</button>
+      <button class="tab-btn" data-tab="upgrades" onclick="switchTab('upgrades')">Upgrades</button>
+      <button class="tab-btn" data-tab="scale" onclick="switchTab('scale')" style="display: none;">Scale Upgrades</button>
+      <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">Settings</button>
+    </div>
+
+    <div class="tab-content active" data-tab="main">
+      <button id="prestige">Unit Collapse</button>
+    </div>
+
+    <div class="tab-content" data-tab="upgrades">
+      <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 300px; max-width: 400px;">
+          <h3 style="color: #88f; margin-bottom: 1rem;">Distance Upgrades</h3>
+          <button class="upgrade-card" id="velocityUpgrade" onclick="buyVelocityUpgrade()">
+            <div class="upgrade-name">Velocity Multiplier</div>
+            <div class="upgrade-level">Level 0</div>
+            <div class="upgrade-effect">1x → 2x</div>
+            <div class="upgrade-cost-label">Cost: <span class="upgrade-cost">10 m</span></div>
+            <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Multiplies distance/sec. Unlocks Acceleration at level 5 (softcapped after).</div>
+          </button>
+
+          <button class="upgrade-card unlock-card" id="accelUpgrade" onclick="buyAccelUpgrade()" style="display: none;">
+            <div class="upgrade-name">Acceleration Boost</div>
+            <div class="upgrade-level">Level 0</div>
+            <div class="upgrade-effect">+0 m/s² → +0.2500 m/s²</div>
+            <div class="upgrade-cost-label">Cost: <span class="upgrade-cost">1000 m</span></div>
+            <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Increases velocity over time. Unlocks at Velocity level 5. Softcapped at level 10 (0.1 m/s² per level after).</div>
+          </button>
+
+          <button class="upgrade-card unlock-card" id="compressionUpgrade" onclick="buyCompressionUpgrade()" style="display: none;">
+            <div class="upgrade-name">Distance Compression</div>
+            <div class="upgrade-level">Level 0</div>
+            <div class="upgrade-effect">/1.000 cost → /2.000 cost</div>
+            <div class="upgrade-cost-label">Cost: <span class="upgrade-cost">1.000e7 m</span></div>
+            <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Divides Velocity and Acceleration costs. Unlocks at Acceleration level 5. Logarithmic softcap (lvl 4=÷4, lvl 9=÷8, lvl 16=÷16).</div>
+          </button>
+        </div>
+
+        <div style="flex: 1; min-width: 300px; max-width: 400px;">
+          <h3 style="color: #f88; margin-bottom: 1rem;">Mass Upgrades</h3>
+          <button class="upgrade-card unlock-card" id="massVelocityUpgrade" onclick="buyMassVelocityUpgrade()" style="display: none;">
+            <div class="upgrade-name">Mass Velocity Boost</div>
+            <div class="upgrade-level">Level 0</div>
+            <div class="upgrade-effect">1.000x → 3.000x</div>
+            <div class="upgrade-cost-label">Cost: <span class="upgrade-cost">100 g</span></div>
+            <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Most powerful multiplier! Applied AFTER all other upgrades (3x per level). Persists with Persistent Mass Upgrades.</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" data-tab="scale">
+      <button class="upgrade-card" id="massGenerationUpgrade" onclick="unlockMassGeneration()" style="border-color: #f88;">
+        <div class="upgrade-name" style="color: #f88;">Unlock Mass Generation</div>
+        <div class="upgrade-effect" style="color: #8f8;">Start generating 1 g/s</div>
+        <div class="upgrade-cost-label" style="color: #88f;">Cost: 1 Scale Point</div>
+        <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Unlocks mass resource (g/s) and Mass Velocity Boost upgrade. Mass persists through prestige but resets to 0.</div>
+      </button>
+
+      <button class="upgrade-card unlock-card" id="tripleMassUpgrade" onclick="unlockTripleMass()" style="display: none;">
+        <div class="upgrade-name">Triple Mass Generation</div>
+        <div class="upgrade-effect" style="color: #8f8;">Mass generation ×3</div>
+        <div class="upgrade-cost-label" style="color: #88f;">Cost: 5 Scale Points</div>
+        <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Permanently triples mass generation (1 g/s → 3 g/s). Unlocks after Mass Generation. Never resets.</div>
+      </button>
+
+      <button class="upgrade-card unlock-card" id="persistentMassUpgrade" onclick="unlockPersistentMass()" style="display: none;">
+        <div class="upgrade-name">Persistent Mass Upgrades</div>
+        <div class="upgrade-effect" style="color: #8f8;">Keep mass upgrades on prestige</div>
+        <div class="upgrade-cost-label" style="color: #88f;">Cost: 15 Scale Points</div>
+        <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Mass Velocity Boost level and cost persist through prestige. Greatly accelerates progression! Mass amount still resets.</div>
+      </button>
+    </div>
+
+    <div class="tab-content" data-tab="settings">
+      <div class="settings-panel">
+        <div class="settings-title">Settings</div>
+        <div id="version" class="settings-version">Version: pre-release 0.1</div>
+
+        <div class="settings-section">
+          <div class="settings-label">Save</div>
+          <div class="settings-row">
+            <button class="settings-btn" onclick="exportSave()">Export Save</button>
+            <button class="settings-btn" onclick="copyExport()">Copy</button>
+          </div>
+          <textarea id="exportBox" class="settings-textarea" rows="5" readonly placeholder="Click Export Save…"></textarea>
+
+          <div class="settings-row" style="margin-top: 0.75rem;">
+            <button class="settings-btn" onclick="importSave()">Import Save</button>
+          </div>
+          <textarea id="importBox" class="settings-textarea" rows="5" placeholder="Paste a save here (raw JSON or base64)…"></textarea>
+          <div id="settingsMsg" class="settings-msg"></div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-label">Tick update rate</div>
+          <div class="settings-row">
+            <input id="tickRate" class="settings-range" type="range" min="10" max="60" step="1" value="60" oninput="onTickRateInput(this.value)" />
+            <span id="tickRateValue" class="settings-value">60</span>
+            <span class="settings-unit">ticks/sec</span>
+          </div>
+          <div class="settings-hint">Higher = smoother decimals, lower = lighter CPU. Game is simulated with a fixed timestep.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="break_infinity.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

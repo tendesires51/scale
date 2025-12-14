@@ -1,0 +1,256 @@
+body {
+  background: #0e0e11;
+  color: #eaeaf0;
+  font-family: system-ui, monospace;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  margin: 0;
+}
+
+#game {
+  text-align: center;
+  max-width: 900px;
+  width: 100%;
+}
+
+#header {
+  margin-bottom: 1.5rem;
+}
+
+#scalePoints {
+  font-size: 1.2rem;
+  color: #88f;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+#distance {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+#rate {
+  font-size: 1rem;
+  opacity: 0.7;
+  margin-bottom: 0.5rem;
+}
+
+#tabs {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.tab-btn {
+  padding: 0.5rem 1.5rem;
+  background: none;
+  border: 1px solid #444;
+  color: #eaeaf0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  border-color: #888;
+}
+
+.tab-btn.active {
+  background: #1a1a1f;
+  border-color: #88f;
+  color: #88f;
+}
+
+.tab-content {
+  display: none;
+  min-height: 200px;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+button {
+  background: none;
+  border: 1px solid #444;
+  color: #eaeaf0;
+  padding: 0.5rem 1rem;
+  margin: 0.25rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: #888;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.upgrade-card {
+  display: block;
+  width: 100%;
+  max-width: 400px;
+  margin: 1rem auto;
+  padding: 1rem;
+  background: #16161a;
+  border: 2px solid #444;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.upgrade-card:hover:not(:disabled) {
+  border-color: #88f;
+  background: #1a1a1f;
+}
+
+.upgrade-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upgrade-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  color: #eaeaf0;
+}
+
+.upgrade-level {
+  font-size: 0.9rem;
+  color: #88f;
+  margin-bottom: 0.5rem;
+}
+
+.upgrade-effect {
+  font-size: 1rem;
+  color: #8f8;
+  margin-bottom: 0.75rem;
+}
+
+.upgrade-cost-label {
+  font-size: 0.9rem;
+  color: #fa0;
+}
+
+.upgrade-cost {
+  font-weight: bold;
+}
+
+.unlock-card {
+  border-color: #f8f;
+  background: #1a121a;
+}
+
+.unlock-card:hover:not(:disabled) {
+  border-color: #f8f;
+  background: #221a22;
+}
+
+.upgrade-unlock-hint {
+  font-size: 0.85rem;
+  color: #f8f;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* ---- Settings UI ---- */
+.settings-panel {
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: left;
+  background: #141418;
+  border: 1px solid #333;
+  padding: 1rem;
+}
+
+.settings-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  color: #eaeaf0;
+}
+
+.settings-version {
+  font-size: 0.95rem;
+  color: #aaa;
+  margin-bottom: 1rem;
+}
+
+.settings-section {
+  border-top: 1px solid #242428;
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.settings-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #88f;
+  margin-bottom: 0.5rem;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.settings-btn {
+  background: none;
+  border: 1px solid #444;
+  color: #eaeaf0;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-btn:hover {
+  border-color: #88f;
+  color: #88f;
+}
+
+.settings-textarea {
+  width: 100%;
+  margin-top: 0.5rem;
+  background: #0f0f12;
+  border: 1px solid #333;
+  color: #eaeaf0;
+  padding: 0.6rem;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+}
+
+.settings-range {
+  width: 280px;
+}
+
+.settings-value {
+  min-width: 2.5rem;
+  text-align: right;
+  color: #eaeaf0;
+}
+
+.settings-unit {
+  color: #aaa;
+}
+
+.settings-hint {
+  margin-top: 0.5rem;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.settings-msg {
+  margin-top: 0.5rem;
+  color: #aaa;
+  font-size: 0.9rem;
+  min-height: 1.1rem;
+}
