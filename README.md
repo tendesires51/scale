@@ -13,3 +13,8 @@ The game emphasizes:
 ## Status
 Pre-release 0.1  
 Actively in development.
+
+
+## Third-Party Libraries
+This project uses **break_infinity.js** by Patashu, licensed under the MIT License.  
+https://github.com/Patashu/break_infinity.js
