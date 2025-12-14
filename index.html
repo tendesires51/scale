@@ -10,6 +10,7 @@
   <div id="game">
     <div id="header">
       <div id="scalePoints">Scale Points: 0</div>
+      <div id="dimensionPoints" style="display: none; color: #f8f;">Dimension Points: 0</div>
       <div id="distance">0 m</div>
       <div id="rate">+0 m / sec</div>
       <div id="mass" style="display: none; color: #f88; margin-top: 1rem;">0 g</div>
@@ -20,11 +21,15 @@
       <button class="tab-btn active" data-tab="main" onclick="switchTab('main')">Main</button>
       <button class="tab-btn" data-tab="upgrades" onclick="switchTab('upgrades')">Upgrades</button>
       <button class="tab-btn" data-tab="scale" onclick="switchTab('scale')" style="display: none;">Scale Upgrades</button>
+      <button class="tab-btn" data-tab="dimensions" onclick="switchTab('dimensions')" style="display: none;">Dimensions</button>
       <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">Settings</button>
     </div>
 
     <div class="tab-content active" data-tab="main">
-      <button id="prestige">Unit Collapse</button>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+        <button id="prestige">Unit Collapse</button>
+        <button id="dimensionCollapse" onclick="dimensionCollapse()" style="display: none; background: linear-gradient(135deg, #f8f 0%, #88f 100%); border-color: #f8f;">Dimension Collapse</button>
+      </div>
     </div>
 
     <div class="tab-content" data-tab="upgrades">
@@ -65,6 +70,13 @@
             <div class="upgrade-cost-label">Cost: <span class="upgrade-cost">100 g</span></div>
             <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Most powerful multiplier! Applied AFTER all other upgrades (3x per level). Persists with Persistent Mass Upgrades.</div>
           </button>
+
+          <button class="upgrade-card unlock-card" id="enhancedDimensionsUpgrade" onclick="unlockEnhancedDimensions()" style="display: none; border-color: #f8f;">
+            <div class="upgrade-name" style="color: #f8f;">Enhanced Dimensions</div>
+            <div class="upgrade-effect" style="color: #8f8;">Dimension base multiplier: 4x → 6x</div>
+            <div class="upgrade-cost-label" style="color: #f88;">Cost: 1 ton (1.000e6 g)</div>
+            <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Unlocks after performing a Dimension Collapse. Increases dimension multiplier from 4x to 6x per level. Persists through Dimension Collapse.</div>
+          </button>
         </div>
       </div>
     </div>
@@ -75,6 +87,13 @@
         <div class="upgrade-effect" style="color: #8f8;">Start generating 1 g/s</div>
         <div class="upgrade-cost-label" style="color: #88f;">Cost: 1 Scale Point</div>
         <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Unlocks mass resource (g/s) and Mass Velocity Boost upgrade. Mass persists through prestige but resets to 0.</div>
+      </button>
+
+      <button class="upgrade-card unlock-card" id="autoUpgradeUpgrade" onclick="unlockAutoUpgrade()" style="display: none;">
+        <div class="upgrade-name">Auto Upgrade</div>
+        <div class="upgrade-effect" style="color: #8f8;">Automatically buy all upgrades</div>
+        <div class="upgrade-cost-label" style="color: #88f;">Cost: 1 Scale Point</div>
+        <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Automatically purchases Velocity, Acceleration, Compression, and Mass Velocity upgrades when you can afford them. Unlocks after Mass Generation.</div>
       </button>
 
       <button class="upgrade-card unlock-card" id="tripleMassUpgrade" onclick="unlockTripleMass()" style="display: none;">
@@ -89,6 +108,23 @@
         <div class="upgrade-effect" style="color: #8f8;">Keep mass upgrades on prestige</div>
         <div class="upgrade-cost-label" style="color: #88f;">Cost: 15 Scale Points</div>
         <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Mass Velocity Boost level and cost persist through prestige. Greatly accelerates progression! Mass amount still resets.</div>
+      </button>
+
+      <button class="upgrade-card unlock-card" id="dimensionCollapseUpgrade" onclick="unlockDimensionCollapse()" style="border-color: #f8f;">
+        <div class="upgrade-name" style="color: #f8f;">Unlock Dimension Collapse</div>
+        <div class="upgrade-effect" style="color: #8f8;">Access to a new prestige layer</div>
+        <div class="upgrade-cost-label" style="color: #88f;">Cost: 25 Scale Points</div>
+        <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Unlock Dimension Collapse prestige (100 ly requirement). RESETS EVERYTHING including Scale Points and upgrades. Grants 1 Dimension Point per collapse. Dimension Points can buy dimensions that multiply ALL resources by 4x each.</div>
+      </button>
+    </div>
+
+    <div class="tab-content" data-tab="dimensions">
+      <button class="upgrade-card" id="buyDimension" onclick="buyDimension()" style="border-color: #f8f;">
+        <div class="upgrade-name" style="color: #f8f;">First Dimension</div>
+        <div class="upgrade-level">Level 0</div>
+        <div class="upgrade-effect">1.000x → 4.000x</div>
+        <div class="upgrade-cost-label" style="color: #f8f;">Cost: <span class="upgrade-cost">1 DP</span></div>
+        <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Multiplies ALL distance and mass generation by 4x per level. Stacks multiplicatively! Never resets on Dimension Collapse.</div>
       </button>
     </div>
 
@@ -120,6 +156,16 @@
             <span class="settings-unit">ticks/sec</span>
           </div>
           <div class="settings-hint">Higher = smoother decimals, lower = lighter CPU. Game is simulated with a fixed timestep.</div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-label">Auto-save interval</div>
+          <div class="settings-row">
+            <input id="autoSaveInterval" class="settings-range" type="range" min="1" max="60" step="1" value="30" oninput="onAutoSaveIntervalInput(this.value)" />
+            <span id="autoSaveIntervalValue" class="settings-value">30</span>
+            <span class="settings-unit">seconds</span>
+          </div>
+          <div class="settings-hint">How often the game automatically saves your progress. Lower = more frequent saves.</div>
         </div>
       </div>
     </div>

@@ -9,6 +9,14 @@ let mass = new Decimal(0)
 let massPerSecond = new Decimal(0) // Starts at 0, unlocked by scale upgrade
 let massUnlocked = false
 
+// Dimension system (unlocks with Dimension Collapse scale upgrade)
+let dimensionPoints = new Decimal(0)
+let dimensionLevel = 0 // How many times you've bought the 4x dimension
+let dimensionCost = new Decimal(1) // First dimension costs 1 DP
+const dimensionCostMultiplier = 1 // Costs 1 DP each time
+let dimensionCollapseUnlocked = false
+let dimensionsTabUnlocked = false
+
 // ---- UI State ----
 let currentTab = 'main'
 let scaleUpgradesUnlocked = false
@@ -36,9 +44,15 @@ let massVelocityLevel = 0
 let massVelocityCost = new Decimal(100) // 100 grams
 const massVelocityCostMultiplier = 3
 
+// Enhanced Dimensions upgrade (costs 1 ton mass)
+let enhancedDimensionsUnlocked = false
+
 // ---- Scale Upgrades ----
 // Unlock Mass Generation (costs 1 Scale Point)
 let massGenerationUnlocked = false
+
+// Auto Upgrade (costs 1 Scale Point)
+let autoUpgradeUnlocked = false
 
 // Triple Mass Generation (costs 1 Scale Point)
 let tripleMassUnlocked = false
@@ -96,6 +110,9 @@ let tickRate = 60 // ticks/sec
 let tickDt = 1 / tickRate
 let tickAccumulator = 0
 
+// Auto-save interval (adjustable from Settings)
+let autoSaveInterval = 30 // seconds
+
 function setTickRate(rate) {
   const r = Math.max(10, Math.min(60, Math.floor(Number(rate) || 60)))
   tickRate = r
@@ -114,8 +131,32 @@ function onTickRateInput(value) {
   setTickRate(value)
 }
 
+function setAutoSaveInterval(seconds) {
+  const s = Math.max(1, Math.min(60, Math.floor(Number(seconds) || 30)))
+  autoSaveInterval = s
+
+  const slider = document.getElementById('autoSaveInterval')
+  const valueEl = document.getElementById('autoSaveIntervalValue')
+  if (slider) slider.value = String(autoSaveInterval)
+  if (valueEl) valueEl.textContent = String(autoSaveInterval)
+
+  // Restart the autosave interval
+  if (window.autoSaveIntervalId) {
+    clearInterval(window.autoSaveIntervalId)
+  }
+  window.autoSaveIntervalId = setInterval(saveGame, autoSaveInterval * 1000)
+
+  saveGame()
+}
+
+// Called by the Settings range input
+function onAutoSaveIntervalInput(value) {
+  setAutoSaveInterval(value)
+}
+
 // Make it accessible from console
 window.setTickRate = setTickRate
+window.setAutoSaveInterval = setAutoSaveInterval
 
 function processTick(dt) {
   // Apply acceleration to increase base velocity
@@ -130,6 +171,11 @@ function processTick(dt) {
   if (massUnlocked) {
     const massMultiplier = calculateMassMultiplier()
     mass = mass.plus(massPerSecond.times(massMultiplier).times(dt))
+  }
+
+  // Auto-buy upgrades if unlocked
+  if (autoUpgradeUnlocked) {
+    autoBuyUpgrades()
   }
 }
 
@@ -195,6 +241,10 @@ function calculateTotalMultiplier() {
     mult = mult.times(Decimal.pow(3, massVelocityLevel))
   }
 
+  // Dimension multiplier - Applied after everything else
+  const dimensionMult = calculateDimensionMultiplier()
+  mult = mult.times(dimensionMult)
+
   return mult
 }
 
@@ -236,7 +286,20 @@ function calculateMassMultiplier() {
     mult = mult.times(3)
   }
 
+  // Dimension multiplier
+  const dimensionMult = calculateDimensionMultiplier()
+  mult = mult.times(dimensionMult)
+
   return mult
+}
+
+// ---- Calculate Dimension Multiplier ----
+function calculateDimensionMultiplier() {
+  if (dimensionLevel === 0) return new Decimal(1)
+
+  // Each dimension level gives 4x multiplier (or 6x if enhanced)
+  const baseMultiplier = enhancedDimensionsUnlocked ? 6 : 4
+  return Decimal.pow(baseMultiplier, dimensionLevel)
 }
 
 // ---- UI ----
@@ -245,6 +308,7 @@ function updateUI() {
   const distanceEl = document.getElementById("distance")
   const rateEl = document.getElementById("rate")
   const scalePointsEl = document.getElementById("scalePoints")
+  const dimensionPointsEl = document.getElementById("dimensionPoints")
   const massEl = document.getElementById("mass")
   const massRateEl = document.getElementById("massRate")
 
@@ -256,6 +320,16 @@ function updateUI() {
   rateEl.textContent = `+${formatDistance(totalRate)} / sec`
 
   scalePointsEl.textContent = `Scale Points: ${scalePoints.toString()}`
+
+  // Update dimension points display if unlocked
+  if (dimensionPointsEl) {
+    if (dimensionsTabUnlocked) {
+      dimensionPointsEl.style.display = 'block'
+      dimensionPointsEl.textContent = `Dimension Points: ${dimensionPoints.toString()}`
+    } else {
+      dimensionPointsEl.style.display = 'none'
+    }
+  }
 
   // Update mass display if unlocked
   if (massEl && massRateEl) {
@@ -277,6 +351,8 @@ function updateUI() {
     updateUpgradesTab()
   } else if (currentTab === 'scale') {
     updateScaleUpgradesTab()
+  } else if (currentTab === 'dimensions') {
+    updateDimensionsTab()
   }
 
   // Update prestige button (only on main tab)
@@ -291,12 +367,32 @@ function updateUI() {
       const scalePointsGain = canPrestige ? Decimal.floor(distance.log10() - 8) : new Decimal(0)
       prestigeBtn.textContent = `Unit Collapse ${canPrestige ? `[+${scalePointsGain} SP]` : '[1.000e6 km]'}`
     }
+
+    // Update dimension collapse button
+    const dimensionBtn = document.getElementById("dimensionCollapse")
+    if (dimensionBtn) {
+      if (dimensionCollapseUnlocked) {
+        dimensionBtn.style.display = 'block'
+        const dimensionThreshold = new Decimal(9.461e15) // 100 ly
+        const canCollapse = distance.gte(dimensionThreshold)
+        dimensionBtn.disabled = !canCollapse
+        dimensionBtn.textContent = `Dimension Collapse ${canCollapse ? '[+1 DP]' : '[100 ly]'}`
+      } else {
+        dimensionBtn.style.display = 'none'
+      }
+    }
   }
 
   // Update Scale Upgrades tab visibility
   const scaleUpgradesTab = document.querySelector('.tab-btn[data-tab="scale"]')
   if (scaleUpgradesTab) {
     scaleUpgradesTab.style.display = scaleUpgradesUnlocked ? 'block' : 'none'
+  }
+
+  // Update Dimensions tab visibility
+  const dimensionsTab = document.querySelector('.tab-btn[data-tab="dimensions"]')
+  if (dimensionsTab) {
+    dimensionsTab.style.display = dimensionsTabUnlocked ? 'block' : 'none'
   }
 }
 
@@ -406,6 +502,30 @@ function updateUpgradesTab() {
       massVelocityBtn.style.display = 'none'
     }
   }
+
+  // Update Enhanced Dimensions unlock (requires dimensions tab unlocked)
+  const enhancedDimensionsBtn = document.getElementById("enhancedDimensionsUpgrade")
+  if (enhancedDimensionsBtn) {
+    if (dimensionsTabUnlocked) {
+      enhancedDimensionsBtn.style.display = 'block'
+      const cost = new Decimal(1e6) // 1 ton
+      const canAfford = mass.gte(cost) && !enhancedDimensionsUnlocked
+      enhancedDimensionsBtn.disabled = !canAfford || enhancedDimensionsUnlocked
+      if (enhancedDimensionsUnlocked) {
+        enhancedDimensionsBtn.textContent = 'Enhanced Dimensions Unlocked!'
+      } else {
+        // Reset to original HTML structure if not unlocked
+        enhancedDimensionsBtn.innerHTML = `
+          <div class="upgrade-name" style="color: #f8f;">Enhanced Dimensions</div>
+          <div class="upgrade-effect" style="color: #8f8;">Dimension base multiplier: 4x → 6x</div>
+          <div class="upgrade-cost-label" style="color: #f88;">Cost: 1 ton (1.000e6 g)</div>
+          <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Unlocks after performing a Dimension Collapse. Increases dimension multiplier from 4x to 6x per level. Persists through Dimension Collapse.</div>
+        `
+      }
+    } else {
+      enhancedDimensionsBtn.style.display = 'none'
+    }
+  }
 }
 
 function updateScaleUpgradesTab() {
@@ -416,6 +536,37 @@ function updateScaleUpgradesTab() {
     massGenBtn.disabled = !canAfford || massGenerationUnlocked
     if (massGenerationUnlocked) {
       massGenBtn.textContent = 'Mass Generation Unlocked!'
+    } else {
+      // Reset to original HTML structure if not unlocked
+      massGenBtn.innerHTML = `
+        <div class="upgrade-name" style="color: #f88;">Unlock Mass Generation</div>
+        <div class="upgrade-effect" style="color: #8f8;">Start generating 1 g/s</div>
+        <div class="upgrade-cost-label" style="color: #88f;">Cost: 1 Scale Point</div>
+        <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Unlocks mass resource (g/s) and Mass Velocity Boost upgrade. Mass persists through prestige but resets to 0.</div>
+      `
+    }
+  }
+
+  // Update Auto Upgrade
+  const autoUpgradeBtn = document.getElementById("autoUpgradeUpgrade")
+  if (autoUpgradeBtn) {
+    if (massGenerationUnlocked) {
+      autoUpgradeBtn.style.display = 'block'
+      const canAfford = scalePoints.gte(1) && !autoUpgradeUnlocked
+      autoUpgradeBtn.disabled = !canAfford || autoUpgradeUnlocked
+      if (autoUpgradeUnlocked) {
+        autoUpgradeBtn.textContent = 'Auto Upgrade Unlocked!'
+      } else {
+        // Reset to original HTML structure if not unlocked
+        autoUpgradeBtn.innerHTML = `
+          <div class="upgrade-name">Auto Upgrade</div>
+          <div class="upgrade-effect" style="color: #8f8;">Automatically buy all upgrades</div>
+          <div class="upgrade-cost-label" style="color: #88f;">Cost: 1 Scale Point</div>
+          <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Automatically purchases Velocity, Acceleration, Compression, and Mass Velocity upgrades when you can afford them. Unlocks after Mass Generation.</div>
+        `
+      }
+    } else {
+      autoUpgradeBtn.style.display = 'none'
     }
   }
 
@@ -428,6 +579,14 @@ function updateScaleUpgradesTab() {
       tripleMassBtn.disabled = !canAfford || tripleMassUnlocked
       if (tripleMassUnlocked) {
         tripleMassBtn.textContent = 'Triple Mass Generation Unlocked!'
+      } else {
+        // Reset to original HTML structure if not unlocked
+        tripleMassBtn.innerHTML = `
+          <div class="upgrade-name">Triple Mass Generation</div>
+          <div class="upgrade-effect" style="color: #8f8;">Mass generation ×3</div>
+          <div class="upgrade-cost-label" style="color: #88f;">Cost: 5 Scale Points</div>
+          <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Permanently triples mass generation (1 g/s → 3 g/s). Unlocks after Mass Generation. Never resets.</div>
+        `
       }
     } else {
       tripleMassBtn.style.display = 'none'
@@ -443,10 +602,54 @@ function updateScaleUpgradesTab() {
       persistentMassBtn.disabled = !canAfford || persistentMassUpgrades
       if (persistentMassUpgrades) {
         persistentMassBtn.textContent = 'Persistent Mass Upgrades Unlocked!'
+      } else {
+        // Reset to original HTML structure if not unlocked
+        persistentMassBtn.innerHTML = `
+          <div class="upgrade-name">Persistent Mass Upgrades</div>
+          <div class="upgrade-effect" style="color: #8f8;">Keep mass upgrades on prestige</div>
+          <div class="upgrade-cost-label" style="color: #88f;">Cost: 15 Scale Points</div>
+          <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Mass Velocity Boost level and cost persist through prestige. Greatly accelerates progression! Mass amount still resets.</div>
+        `
       }
     } else {
       persistentMassBtn.style.display = 'none'
     }
+  }
+
+  // Update Dimension Collapse unlock
+  const dimensionCollapseBtn = document.getElementById("dimensionCollapseUpgrade")
+  if (dimensionCollapseBtn) {
+    const canAfford = scalePoints.gte(25) && !dimensionCollapseUnlocked
+    dimensionCollapseBtn.disabled = !canAfford || dimensionCollapseUnlocked
+    if (dimensionCollapseUnlocked) {
+      dimensionCollapseBtn.textContent = 'Dimension Collapse Unlocked!'
+    } else {
+      // Reset to original HTML structure if not unlocked
+      dimensionCollapseBtn.innerHTML = `
+        <div class="upgrade-name" style="color: #f8f;">Unlock Dimension Collapse</div>
+        <div class="upgrade-effect" style="color: #8f8;">Access to a new prestige layer</div>
+        <div class="upgrade-cost-label" style="color: #88f;">Cost: 25 Scale Points</div>
+        <div class="upgrade-unlock-hint" style="color: #aaa; margin-top: 0.5rem;">Unlock Dimension Collapse prestige (100 ly requirement). RESETS EVERYTHING including Scale Points and upgrades. Grants 1 Dimension Point per collapse. Dimension Points can buy dimensions that multiply ALL resources by 4x each.</div>
+      `
+    }
+  }
+
+}
+
+function updateDimensionsTab() {
+  // Update dimension purchase button
+  const dimensionBtn = document.getElementById("buyDimension")
+  if (dimensionBtn) {
+    const canAfford = dimensionPoints.gte(dimensionCost)
+    dimensionBtn.disabled = !canAfford
+    dimensionBtn.querySelector('.upgrade-level').textContent = `Level ${dimensionLevel}`
+    dimensionBtn.querySelector('.upgrade-cost').textContent = `${dimensionCost.toString()} DP`
+
+    const baseMultiplier = enhancedDimensionsUnlocked ? 6 : 4
+    const currentEffect = dimensionLevel === 0 ? new Decimal(1) : Decimal.pow(baseMultiplier, dimensionLevel)
+    const nextEffect = Decimal.pow(baseMultiplier, dimensionLevel + 1)
+    dimensionBtn.querySelector('.upgrade-effect').textContent =
+      `${currentEffect.toPrecision(4)}x → ${nextEffect.toPrecision(4)}x (${baseMultiplier}x base)`
   }
 }
 
@@ -507,12 +710,62 @@ function buyMassVelocityUpgrade() {
   }
 }
 
+function autoBuyUpgrades() {
+  // Auto-buy distance upgrades
+  const compressionDivision = calculateCompressionDivision()
+
+  // Buy velocity upgrades
+  const discountedVelocityCost = upgradeCost.div(compressionDivision)
+  if (distance.gte(discountedVelocityCost)) {
+    distance = distance.minus(discountedVelocityCost)
+    upgradeLevel++
+    upgradeCost = upgradeCost.times(upgradeCostMultiplier)
+  }
+
+  // Buy acceleration upgrades if unlocked
+  if (accelUnlocked) {
+    const discountedAccelCost = accelCost.div(compressionDivision)
+    if (distance.gte(discountedAccelCost)) {
+      distance = distance.minus(discountedAccelCost)
+      accelLevel++
+      accelCost = accelCost.times(accelCostMultiplier)
+    }
+  }
+
+  // Buy compression upgrades if unlocked
+  if (compressionUnlocked) {
+    if (distance.gte(compressionCost)) {
+      distance = distance.minus(compressionCost)
+      compressionLevel++
+      compressionCost = compressionCost.times(compressionCostMultiplier)
+    }
+  }
+
+  // Buy mass velocity upgrades if unlocked
+  if (massUnlocked) {
+    if (mass.gte(massVelocityCost)) {
+      mass = mass.minus(massVelocityCost)
+      massVelocityLevel++
+      massVelocityCost = massVelocityCost.times(massVelocityCostMultiplier)
+    }
+  }
+}
+
 function unlockMassGeneration() {
   if (scalePoints.gte(1) && !massGenerationUnlocked) {
     scalePoints = scalePoints.minus(1)
     massGenerationUnlocked = true
     massUnlocked = true
     massPerSecond = new Decimal(1) // Start at 1 g/s
+    updateUI()
+    saveGame()
+  }
+}
+
+function unlockAutoUpgrade() {
+  if (scalePoints.gte(1) && !autoUpgradeUnlocked && massGenerationUnlocked) {
+    scalePoints = scalePoints.minus(1)
+    autoUpgradeUnlocked = true
     updateUI()
     saveGame()
   }
@@ -531,6 +784,35 @@ function unlockPersistentMass() {
   if (scalePoints.gte(15) && !persistentMassUpgrades && massGenerationUnlocked) {
     scalePoints = scalePoints.minus(15)
     persistentMassUpgrades = true
+    updateUI()
+    saveGame()
+  }
+}
+
+function unlockDimensionCollapse() {
+  if (scalePoints.gte(25) && !dimensionCollapseUnlocked) {
+    scalePoints = scalePoints.minus(25)
+    dimensionCollapseUnlocked = true
+    updateUI()
+    saveGame()
+  }
+}
+
+function unlockEnhancedDimensions() {
+  const cost = new Decimal(1e6) // 1 ton = 1e6 grams
+  if (mass.gte(cost) && !enhancedDimensionsUnlocked && dimensionsTabUnlocked) {
+    mass = mass.minus(cost)
+    enhancedDimensionsUnlocked = true
+    updateUI()
+    saveGame()
+  }
+}
+
+function buyDimension() {
+  if (dimensionPoints.gte(dimensionCost)) {
+    dimensionPoints = dimensionPoints.minus(dimensionCost)
+    dimensionLevel++
+    dimensionCost = dimensionCost.plus(dimensionCostMultiplier)
     updateUI()
     saveGame()
   }
@@ -581,6 +863,55 @@ document.getElementById("prestige").onclick = () => {
   saveGame()
 }
 
+// ---- Prestige: Dimension Collapse ----
+function dimensionCollapse() {
+  const dimensionThreshold = new Decimal(9.461e15) // 100 ly = 9.461e15 m
+  if (distance.lt(dimensionThreshold)) return
+  if (!dimensionCollapseUnlocked) return
+
+  // Grant 1 dimension point
+  dimensionPoints = dimensionPoints.plus(1)
+
+  // Unlock Dimensions tab on first dimension collapse
+  if (!dimensionsTabUnlocked) {
+    dimensionsTabUnlocked = true
+  }
+
+  // RESET EVERYTHING
+  distance = new Decimal(0)
+  distancePerSecond = new Decimal(1)
+  scalePoints = new Decimal(0)
+
+  // Reset all distance upgrades
+  upgradeLevel = 0
+  upgradeCost = new Decimal(10)
+  accelLevel = 0
+  accelCost = new Decimal(1000)
+  accelUnlocked = false
+  compressionLevel = 0
+  compressionCost = new Decimal(1e7)
+  compressionUnlocked = false
+
+  // Reset mass completely
+  mass = new Decimal(0)
+  massPerSecond = new Decimal(0)
+  massUnlocked = false
+  massVelocityLevel = 0
+  massVelocityCost = new Decimal(100)
+
+  // Reset scale upgrades (keep them locked but remember you had them)
+  massGenerationUnlocked = false
+  autoUpgradeUnlocked = false
+  tripleMassUnlocked = false
+  persistentMassUpgrades = false
+
+  // Keep: dimensionCollapseUnlocked, scaleUpgradesUnlocked, dimensionsTabUnlocked
+  // Keep: dimensionPoints, dimensionLevel, dimensionCost
+
+  updateUI()
+  saveGame()
+}
+
 // ---- Save/Load ----
 function saveGame() {
   const saveData = {
@@ -602,12 +933,23 @@ function saveGame() {
     massVelocityLevel: massVelocityLevel,
     massVelocityCost: massVelocityCost.toString(),
     massGenerationUnlocked: massGenerationUnlocked,
+    autoUpgradeUnlocked: autoUpgradeUnlocked,
     tripleMassUnlocked: tripleMassUnlocked,
     persistentMassUpgrades: persistentMassUpgrades,
+    dimensionPoints: dimensionPoints.toString(),
+    dimensionLevel: dimensionLevel,
+    dimensionCost: dimensionCost.toString(),
+    dimensionCollapseUnlocked: dimensionCollapseUnlocked,
+    dimensionsTabUnlocked: dimensionsTabUnlocked,
+    enhancedDimensionsUnlocked: enhancedDimensionsUnlocked,
     tickRate: tickRate,
+    autoSaveInterval: autoSaveInterval,
     lastTime: Date.now()
   }
-  localStorage.setItem('scaleSave', JSON.stringify(saveData))
+  // Save to localStorage in base64 format
+  const jsonString = JSON.stringify(saveData)
+  const encoded = btoa(jsonString)
+  localStorage.setItem('scaleSave', encoded)
 }
 
 function loadGame() {
@@ -615,7 +957,16 @@ function loadGame() {
   if (!saveData) return
 
   try {
-    const data = JSON.parse(saveData)
+    // Try to decode from base64 first (new format)
+    let jsonString = saveData
+    try {
+      jsonString = atob(saveData)
+    } catch {
+      // If base64 decode fails, assume it's raw JSON (backwards compatibility)
+      console.log('Loading from old JSON format, will convert to base64 on next save')
+    }
+
+    const data = JSON.parse(jsonString)
     distance = new Decimal(data.distance)
     distancePerSecond = new Decimal(data.distancePerSecond)
     scalePoints = new Decimal(data.scalePoints)
@@ -634,14 +985,26 @@ function loadGame() {
     massVelocityLevel = data.massVelocityLevel || 0
     massVelocityCost = new Decimal(data.massVelocityCost || 100)
     massGenerationUnlocked = data.massGenerationUnlocked || false
+    autoUpgradeUnlocked = data.autoUpgradeUnlocked || false
     tripleMassUnlocked = data.tripleMassUnlocked || false
     persistentMassUpgrades = data.persistentMassUpgrades || false
+    dimensionPoints = new Decimal(data.dimensionPoints || 0)
+    dimensionLevel = data.dimensionLevel || 0
+    dimensionCost = new Decimal(data.dimensionCost || 1)
+    dimensionCollapseUnlocked = data.dimensionCollapseUnlocked || false
+    dimensionsTabUnlocked = data.dimensionsTabUnlocked || false
+    enhancedDimensionsUnlocked = data.enhancedDimensionsUnlocked || false
 
     // Settings
     if (data.tickRate) {
       const r = Math.max(10, Math.min(60, Math.floor(Number(data.tickRate) || 60)))
       tickRate = r
       tickDt = 1 / tickRate
+    }
+
+    if (data.autoSaveInterval) {
+      const s = Math.max(1, Math.min(60, Math.floor(Number(data.autoSaveInterval) || 30)))
+      autoSaveInterval = s
     }
 
     // Calculate offline progress
@@ -670,10 +1033,16 @@ function initSettingsUI() {
   if (v) v.textContent = `Version: ${GAME_VERSION}`
 
   // Sync tick rate UI to current value (loaded from save or default)
-  const slider = document.getElementById('tickRate')
-  const valueEl = document.getElementById('tickRateValue')
-  if (slider) slider.value = String(tickRate)
-  if (valueEl) valueEl.textContent = String(tickRate)
+  const tickSlider = document.getElementById('tickRate')
+  const tickValueEl = document.getElementById('tickRateValue')
+  if (tickSlider) tickSlider.value = String(tickRate)
+  if (tickValueEl) tickValueEl.textContent = String(tickRate)
+
+  // Sync autosave interval UI to current value (loaded from save or default)
+  const saveSlider = document.getElementById('autoSaveInterval')
+  const saveValueEl = document.getElementById('autoSaveIntervalValue')
+  if (saveSlider) saveSlider.value = String(autoSaveInterval)
+  if (saveValueEl) saveValueEl.textContent = String(autoSaveInterval)
 }
 
 function setSettingsMsg(text, isError = false) {
@@ -686,13 +1055,14 @@ function setSettingsMsg(text, isError = false) {
 function exportSave() {
   // Ensure we have something to export
   saveGame()
-  const raw = localStorage.getItem('scaleSave') || ''
+  const encoded = localStorage.getItem('scaleSave') || ''
   const box = document.getElementById('exportBox')
   if (box) {
-    box.value = raw
+    // Already in base64 format from localStorage
+    box.value = encoded
     box.scrollTop = 0
   }
-  setSettingsMsg(raw ? `Exported ${raw.length.toLocaleString()} characters.` : 'No save found yet.')
+  setSettingsMsg(encoded ? `Exported ${encoded.length.toLocaleString()} characters (base64 encoded).` : 'No save found yet.')
 }
 
 async function copyExport() {
@@ -725,23 +1095,25 @@ function importSave() {
   let parsed = null
   let raw = input
 
-  // Try raw JSON first
+  // Try base64 → JSON first (new default)
   try {
-    parsed = JSON.parse(input)
+    raw = atob(input)
+    parsed = JSON.parse(raw)
   } catch {
-    // Try base64 → JSON
+    // Fallback to raw JSON (for backwards compatibility)
     try {
-      raw = atob(input)
-      parsed = JSON.parse(raw)
+      parsed = JSON.parse(input)
     } catch {
-      setSettingsMsg('Import failed: invalid JSON (and not valid base64 JSON).', true)
+      setSettingsMsg('Import failed: invalid base64 or JSON format.', true)
       return
     }
   }
 
-  // Re-serialize to ensure localStorage holds a clean JSON string
+  // Re-serialize and encode to base64 for localStorage
   try {
-    localStorage.setItem('scaleSave', JSON.stringify(parsed))
+    const jsonString = JSON.stringify(parsed)
+    const encoded = btoa(jsonString)
+    localStorage.setItem('scaleSave', encoded)
     setSettingsMsg('Import successful. Reloading…')
     location.reload()
   } catch (e) {
@@ -755,9 +1127,19 @@ window.exportSave = exportSave
 window.copyExport = copyExport
 window.importSave = importSave
 window.onTickRateInput = onTickRateInput
+window.onAutoSaveIntervalInput = onAutoSaveIntervalInput
 
-// Auto-save every 5 seconds
-setInterval(saveGame, 5000)
+// Make dimension functions accessible from inline HTML onclick
+window.dimensionCollapse = dimensionCollapse
+window.unlockDimensionCollapse = unlockDimensionCollapse
+window.unlockEnhancedDimensions = unlockEnhancedDimensions
+window.buyDimension = buyDimension
+
+// Make scale upgrade functions accessible
+window.unlockAutoUpgrade = unlockAutoUpgrade
+
+// Auto-save with configurable interval (default 30 seconds)
+window.autoSaveIntervalId = setInterval(saveGame, autoSaveInterval * 1000)
 
 // ---- Hard Reset ----
 function hardReset() {
