@@ -1,5 +1,5 @@
 // ---- Core State ----
-const GAME_VERSION = "pre-release 0.1"
+const GAME_VERSION = "pre-release 0.21"
 let distance = new Decimal(0)
 let distancePerSecond = new Decimal(1) // Start at 1 m/s
 let scalePoints = new Decimal(0)
