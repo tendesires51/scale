@@ -169,6 +169,15 @@
         </div>
 
         <div class="settings-section">
+          <div class="settings-label">Bot Mode (for testing)</div>
+          <div class="settings-row">
+            <input type="checkbox" id="botModeCheckbox" onchange="toggleBotMode()" style="width: auto; cursor: pointer;" />
+            <label for="botModeCheckbox" style="cursor: pointer; color: #aaa;">Enable automatic playtest bot</label>
+          </div>
+          <div class="settings-hint">Bot will automatically play the game to test balancing. Check the console for bot activity logs.</div>
+        </div>
+
+        <div class="settings-section">
           <details>
             <summary style="cursor: pointer; font-size: 1rem; color: #88f; margin-bottom: 0.5rem; user-select: none;">Changelog</summary>
             <div style="margin-left: 1rem; color: #aaa; font-size: 0.9rem; line-height: 1.6;">

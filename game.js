@@ -1,3 +1,5 @@
+window.BOT_MODE = false;
+
 // ---- Core State ----
 const GAME_VERSION = "pre-release 0.21"
 let distance = new Decimal(0)
@@ -177,7 +179,137 @@ function processTick(dt) {
   if (autoUpgradeUnlocked) {
     autoBuyUpgrades()
   }
+
+  // Run bot if enabled
+  if (window.BOT_MODE && window.botTick) {
+    botTick()
+  }
 }
+
+// ---- Bot State ----
+function botState() {
+  const prestigeThreshold = new Decimal(1e9)
+  const dimensionThreshold = new Decimal(9.461e15)
+
+  return {
+    velocityLevel: upgradeLevel,
+    accelLevel: accelLevel,
+    accelUnlocked: accelUnlocked,
+    compressionLevel: compressionLevel,
+    compressionUnlocked: compressionUnlocked,
+    scalePoints: scalePoints,
+    canPrestige: distance.gte(prestigeThreshold),
+    massUnlocked: massUnlocked,
+    mass: mass,
+    canDimensionCollapse: dimensionCollapseUnlocked && distance.gte(dimensionThreshold)
+  }
+}
+
+// ---- Bot Logic ----
+const botStartTime = performance.now()
+const botMilestones = new Set()
+
+function botLog(name) {
+  if (botMilestones.has(name)) return
+  botMilestones.add(name)
+  const t = ((performance.now() - botStartTime) / 1000).toFixed(2)
+  console.log(`[BOT] ${name} @ ${t}s`)
+}
+
+function botTick() {
+  if (!window.BOT_MODE) return
+  const s = botState()
+
+  // Priority 1: Dimension Collapse (when possible, huge boost)
+  if (s.canDimensionCollapse && window.dimensionCollapse) {
+    botLog("Dimension Collapse")
+    dimensionCollapse()
+    return
+  }
+
+  // Priority 2: Buy Dimensions (most powerful multiplier)
+  if (dimensionsTabUnlocked && dimensionPoints.gte(dimensionCost) && window.buyDimension) {
+    buyDimension()
+    return
+  }
+
+  // Priority 3: Unlock Enhanced Dimensions (6x base instead of 4x)
+  if (dimensionsTabUnlocked && !enhancedDimensionsUnlocked && mass.gte(1e6) && window.unlockEnhancedDimensions) {
+    unlockEnhancedDimensions()
+    botLog("Enhanced Dimensions Unlocked")
+    return
+  }
+
+  // Priority 4: Buy Mass Velocity upgrades (very powerful)
+  if (s.massUnlocked && mass.gte(massVelocityCost) && window.buyMassVelocityUpgrade) {
+    buyMassVelocityUpgrade()
+    return
+  }
+
+  // Priority 5: Scale Upgrades (unlock important features)
+  if (s.scalePoints.gte(25) && !dimensionCollapseUnlocked && window.unlockDimensionCollapse) {
+    unlockDimensionCollapse()
+    botLog("Dimension Collapse Unlocked")
+    return
+  }
+
+  if (s.scalePoints.gte(15) && !persistentMassUpgrades && massGenerationUnlocked && window.unlockPersistentMass) {
+    unlockPersistentMass()
+    botLog("Persistent Mass Upgrades Unlocked")
+    return
+  }
+
+  if (s.scalePoints.gte(5) && !tripleMassUnlocked && massGenerationUnlocked && window.unlockTripleMass) {
+    unlockTripleMass()
+    botLog("Triple Mass Unlocked")
+    return
+  }
+
+  if (s.scalePoints.gte(1) && !autoUpgradeUnlocked && massGenerationUnlocked && window.unlockAutoUpgrade) {
+    unlockAutoUpgrade()
+    botLog("Auto Upgrade Unlocked")
+    return
+  }
+
+  if (s.scalePoints.gte(1) && !s.massUnlocked && window.unlockMassGeneration) {
+    unlockMassGeneration()
+    botLog("Mass Generation Unlocked")
+    return
+  }
+
+  // Priority 6: Unit Collapse (for scale points)
+  if (s.canPrestige && document.getElementById("prestige")) {
+    botLog("Unit Collapse")
+    document.getElementById("prestige").click()
+    return
+  }
+
+  // Priority 7: Distance upgrades (only if auto-upgrade not unlocked)
+  if (!autoUpgradeUnlocked) {
+    const compressionDivision = calculateCompressionDivision()
+
+    // Buy compression if available and level < 10
+    if (s.compressionUnlocked && compressionLevel < 10 && distance.gte(compressionCost) && window.buyCompressionUpgrade) {
+      buyCompressionUpgrade()
+      return
+    }
+
+    // Buy acceleration if available and level < 20
+    if (s.accelUnlocked && accelLevel < 20 && distance.gte(accelCost.div(compressionDivision)) && window.buyAccelUpgrade) {
+      buyAccelUpgrade()
+      return
+    }
+
+    // Buy velocity if level < 20
+    if (upgradeLevel < 20 && distance.gte(upgradeCost.div(compressionDivision)) && window.buyVelocityUpgrade) {
+      buyVelocityUpgrade()
+      return
+    }
+  }
+}
+
+window.botState = botState
+window.botTick = botTick
 
 function gameLoop() {
   try {
@@ -944,6 +1076,7 @@ function saveGame() {
     enhancedDimensionsUnlocked: enhancedDimensionsUnlocked,
     tickRate: tickRate,
     autoSaveInterval: autoSaveInterval,
+    botMode: window.BOT_MODE,
     lastTime: Date.now()
   }
   // Save to localStorage in base64 format
@@ -1007,6 +1140,10 @@ function loadGame() {
       autoSaveInterval = s
     }
 
+    if (data.botMode !== undefined) {
+      window.BOT_MODE = data.botMode
+    }
+
     // Calculate offline progress
     if (data.lastTime) {
       const offlineTime = (Date.now() - data.lastTime) / 1000
@@ -1043,6 +1180,24 @@ function initSettingsUI() {
   const saveValueEl = document.getElementById('autoSaveIntervalValue')
   if (saveSlider) saveSlider.value = String(autoSaveInterval)
   if (saveValueEl) saveValueEl.textContent = String(autoSaveInterval)
+
+  // Sync bot mode checkbox
+  const botCheckbox = document.getElementById('botModeCheckbox')
+  if (botCheckbox) botCheckbox.checked = window.BOT_MODE
+}
+
+function toggleBotMode() {
+  window.BOT_MODE = !window.BOT_MODE
+  const checkbox = document.getElementById('botModeCheckbox')
+  if (checkbox) checkbox.checked = window.BOT_MODE
+
+  if (window.BOT_MODE) {
+    console.log('[BOT] Bot mode enabled')
+  } else {
+    console.log('[BOT] Bot mode disabled')
+  }
+
+  saveGame()
 }
 
 function setSettingsMsg(text, isError = false) {
@@ -1128,6 +1283,7 @@ window.copyExport = copyExport
 window.importSave = importSave
 window.onTickRateInput = onTickRateInput
 window.onAutoSaveIntervalInput = onAutoSaveIntervalInput
+window.toggleBotMode = toggleBotMode
 
 // Make dimension functions accessible from inline HTML onclick
 window.dimensionCollapse = dimensionCollapse
